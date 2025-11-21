@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>離線文字編輯器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f7;
+      color: #333;
+    }
+
+    header {
+      padding: 10px 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #ddd;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 16px;
+      background: #fafafa;
+      border-bottom: 1px solid #ddd;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-right: 8px;
+    }
+
+    .toolbar label {
+      font-size: 12px;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    select,
+    input[type="number"],
+    input[type="color"] {
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+
+    button.tool-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      min-width: 28px;
+    }
+
+    button.tool-btn.active {
+      border-color: #007bff;
+      background: #e6f0ff;
+    }
+
+    button.tool-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .container {
+      display: flex;
+      gap: 0;
+      height: calc(100vh - 140px);
+      max-height: calc(100vh - 140px);
+    }
+
+    .pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ddd;
+      background: #ffffff;
+    }
+
+    .pane:last-child {
+      border-right: none;
+    }
+
+    .pane-header {
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fafafa;
+      border-bottom: 1px solid #eee;
+      color: #555;
+    }
+
+    #editor {
+      flex: 1;
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.6;
+      outline: none;
+      overflow-y: auto;
+    }
+
+    #preview {
+      flex: 1;
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-y: auto;
+      background: #fcfcfc;
+    }
+
+    #htmlCode {
+      width: 100%;
+      height: 120px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .footer {
+      padding: 8px 16px 12px 16px;
+      background: #ffffff;
+      border-top: 1px solid #ddd;
+      font-size: 12px;
+    }
+
+    .footer-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .footer button {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .footer button:hover {
+      background: #f0f0f0;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        flex-direction: column;
+        height: auto;
+        max-height: none;
+      }
+      .pane {
+        height: 45vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>離線文字編輯器（貼上文字 → 調整樣式 → 預覽 → 複製 HTML）</header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <label for="fontFamily">字體</label>
+      <select id="fontFamily">
+        <option value="system">系統預設</option>
+        <option value='"Noto Sans TC", "Microsoft JhengHei", sans-serif'>Noto / 微軟正黑</option>
+        <option value='"PingFang TC", "Heiti TC", sans-serif'>蘋方 / 黑體</option>
+        <option value='"Times New Roman", serif'>Times New Roman</option>
+        <option value='"Georgia", serif'>Georgia</option>
+      </select>
+    </div>
+
+    <div class="toolbar-group">
+      <label for="fontSize">大小</label>
+      <input type="number" id="fontSize" value="15" min="10" max="40" /> px
+    </div>
+
+    <div class="toolbar-group">
+      <button class="tool-btn" data-cmd="bold"><b>B</b></button>
+      <button class="tool-btn" data-cmd="italic"><i>I</i></button>
+      <button class="tool-btn" data-cmd="underline"><u>U</u></button>
+      <button class="tool-btn" data-cmd="removeFormat">清除樣式</button>
+    </div>
+
+    <div class="toolbar-group">
+      <label>文字色</label>
+      <input type="color" id="fontColor" value="#333333" />
+      <label>背景</label>
+      <input type="color" id="bgColor" value="#ffffff" />
+    </div>
+
+    <div class="toolbar-group">
+      <button class="tool-btn" data-cmd="justifyLeft">左</button>
+      <button class="tool-btn" data-cmd="justifyCenter">中</button>
+      <button class="tool-btn" data-cmd="justifyRight">右</button>
+      <button class="tool-btn" data-cmd="insertUnorderedList">• 列表</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="pane">
+      <div class="pane-header">編輯區（可直接貼上文字並編輯）</div>
+      <div id="editor" contenteditable="true">
+        在這裡貼上你的文字，然後使用上方工具列調整樣式與排版…
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-header">預覽區（即時顯示效果）</div>
+      <div id="preview"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-actions">
+      <span>下方為目前內容對應的 HTML 程式碼：</span>
+      <button id="copyHtmlBtn">複製 HTML 程式碼</button>
+    </div>
+    <textarea id="htmlCode" readonly></textarea>
+  </div>
+
+  <script>
+    // 取得元素
+    const editor = document.getElementById("editor");
+    const preview = document.getElementById("preview");
+    const htmlCode = document.getElementById("htmlCode");
+    const fontFamilySelect = document.getElementById("fontFamily");
+    const fontSizeInput = document.getElementById("fontSize");
+    const fontColorInput = document.getElementById("fontColor");
+    const bgColorInput = document.getElementById("bgColor");
+    const copyHtmlBtn = document.getElementById("copyHtmlBtn");
+    const toolButtons = document.querySelectorAll("button.tool-btn");
+
+    // 更新預覽與 HTML 程式碼
+    function updatePreview() {
+      preview.innerHTML = editor.innerHTML;
+      htmlCode.value = editor.innerHTML.trim();
+    }
+
+    // 初始化預覽
+    updatePreview();
+
+    // 監聽編輯區變化
+    editor.addEventListener("input", updatePreview);
+    editor.addEventListener("keyup", updatePreview);
+    editor.addEventListener("mouseup", updatePreview);
+
+    // 工具列 - 文字樣式命令（針對選取文字）
+    function execCommand(command, value = null) {
+      document.execCommand(command, false, value);
+      updatePreview();
+      editor.focus();
+    }
+
+    toolButtons.forEach((btn) => {
+      const cmd = btn.getAttribute("data-cmd");
+      btn.addEventListener("click", () => {
+        execCommand(cmd);
+      });
+    });
+
+    // 基礎樣式：整體字體
+    fontFamilySelect.addEventListener("change", () => {
+      const val = fontFamilySelect.value;
+      if (val === "system") {
+        editor.style.fontFamily =
+          'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      } else {
+        editor.style.fontFamily = val;
+      }
+      updatePreview();
+    });
+
+    // 基礎樣式：整體大小
+    fontSizeInput.addEventListener("change", () => {
+      const size = parseInt(fontSizeInput.value, 10);
+      if (!isNaN(size) && size > 0) {
+        editor.style.fontSize = size + "px";
+        updatePreview();
+      }
+    });
+
+    // 選取文字顏色
+    fontColorInput.addEventListener("input", () => {
+      execCommand("foreColor", fontColorInput.value);
+    });
+
+    // 編輯區背景色
+    bgColorInput.addEventListener("input", () => {
+      editor.style.backgroundColor = bgColorInput.value;
+      updatePreview();
+    });
+
+    // 複製 HTML 程式碼
+    copyHtmlBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(htmlCode.value);
+        copyHtmlBtn.textContent = "已複製！";
+        setTimeout(() => {
+          copyHtmlBtn.textContent = "複製 HTML 程式碼";
+        }, 1200);
+      } catch (e) {
+        alert("無法使用自動複製，請手動選取文字後 Ctrl+C / ⌘+C 複製。");
+      }
+    });
+  </script>
+</body>
+</html>
